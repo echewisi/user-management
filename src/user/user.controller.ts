@@ -1,57 +1,33 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Patch,
-  Delete,
-  Req,
-  Res,
-  HttpStatus,
-  Param,
-} from '@nestjs/common';
+// user.controller.ts
+
+import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { UpdateUserDto } from '../dto/update-user.dto';
-import { LoginUserDto } from '../dto/login-user.dto';
-import { JwtService } from '@nestjs/jwt';
-import { LogoutDto } from '../dto/logout.dto'; // Import the LogoutDto
+import { User } from './user.entity';
 
 @Controller('users')
 export class UserController {
-  constructor(
-    private readonly userService: UserService,
-    private readonly jwtService: JwtService,
-  ) {}
+  constructor(private readonly userService: UserService) {}
 
-  @Post('/signup')
-  async signUp(@Body() createUserDto: CreateUserDto) {
-    const user = await this.userService.create(createUserDto);
-    return user; // Assuming the user is returned after creation
+  @Get()
+  async getAllUsers(): Promise<User[]> {
+    return this.userService.findAll();
   }
 
-  @Post('/login')
-  async login(@Body() loginUserDto: LoginUserDto, @Res() res) {
-    const user = await this.userService.login(loginUserDto);
+  @Get(':id')
+  async getUserById(@Param('id') id: string): Promise<User> {
+    const user = await this.userService.findById(id);
     if (!user) {
-      return res
-        .status(HttpStatus.UNAUTHORIZED)
-        .json({ message: 'Invalid credentials' });
+      throw new NotFoundException('User not found');
     }
-    const token = this.jwtService.sign({ email: user.email }); // Generate JWT token
-    return res.status(HttpStatus.OK).json({ token }); // Send JWT token to client
+    return user;
   }
 
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(id, updateUserDto);
-  }
-
-  @Delete('/logout') // Change the route to include a leading slash
-  async logout(@Body() logoutDto: LogoutDto, @Res() res) {
-    // Inject the LogoutDto
-    await this.userService.logout(logoutDto); // Call the logout method from the user service
-    return res
-      .status(HttpStatus.OK)
-      .json({ message: 'Logged out successfully' });
+  @Get('email/:email')
+  async getUserByEmail(@Param('email') email: string): Promise<User> {
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user;
   }
 }
