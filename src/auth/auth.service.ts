@@ -7,6 +7,7 @@ import { UpdateUserDto } from '../dto/update-user.dto';
 import { LogoutDto } from 'src/dto/logout-user.dto';
 import { User } from '../user/user.entity';
 import { TokenBlacklistService } from './token-blacklist.service';
+import { KafkaProducerService } from '../kafka/kafka.producer';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly tokenBlacklistService: TokenBlacklistService,
+    private readonly kafkaProducerService: KafkaProducerService,
   ) {}
 
   async login(LoginUserDto: LoginUserDto): Promise<string | null> {
@@ -29,10 +31,17 @@ export class AuthService {
     if (!isValidCredentials) {
       return null;
     }
+    await this.kafkaProducerService.userLoggedIn(user.id);
     return this.jwtService.sign({ email });
   }
+
   async register(registerDto: CreateUserDto): Promise<User> {
-    return this.userService.create(registerDto);
+    const newUser = await this.userService.create(registerDto);
+
+    // Send message to Kafka indicating user registration
+    await this.kafkaProducerService.userRegistered(newUser.id);
+
+    return newUser;
   }
 
   async updateUser(
